@@ -1,13 +1,32 @@
-const express = require('express');
-const path = require('path');
-const PORT = process.env.PORT || 5000;
+const http = require('http');
+const createHandler = require('github-webhook-handler');
 const fetch = require('node-fetch');
+
+const PORT = process.env.PORT || 5000;
 const githubToken = process.env.GITHUB_TOKEN;
 
-express()
-	.post('/', (req, res) => {
-		console.log(req.body);
-		res.setHeader('Content-Type', 'application/json');
-		res.send(JSON.stringify({ a: 1 }));
+function addLabels(payload, labels) {
+	const repoName = payload.repository.name;
+	const number = payload.number;
+	const url = `https://api.github.com/repos/buronnie/${repoName}/issues/${number}/labels?access_token=${githubToken}`;
+	return fetch(url, {
+		method: 'POST',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify(labels),
 	})
-	.listen(PORT, () => console.log(`Listening on ${ PORT }`))
+}
+
+const handler = createHandler({ path: '/prcreate', secret: 'dolphinissmart' });
+http.createServer(function (req, res) {
+  handler(req, res, function (err) {
+    res.statusCode = 404
+    res.end('no such location')
+  })
+}).listen(PORT);
+
+handler.on('pull_request', function ({ payload }) {
+	console.log(payload);
+	if (payload.action === 'opened') {
+		addLabels(payload, ['bug', 'invalid']);
+	}
+});
